@@ -1,10 +1,10 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -s -O3
 
-SRCS = src/main.c
+SRCS = src/hcu.c
 OBJS = $(SRCS:.c=.o)
 
-TARGET = myprogram
+TARGET = hcu
 
 PREFIX = /usr/local
 
