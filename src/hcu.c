@@ -19,11 +19,15 @@
 
 #include <stdio.h>   
 #include <stdlib.h> 
-#include <stddef.h> 
+#include <stddef.h>
+#include <dirent.h> 
+
+
 /*  
  *  :::::::::::::ProgramData:::::::::::::::
  *  This struct will hold relevant program data.
  *  Pid: this is the process id.
+ *  percentage: this is the percentage of the CPU the process is using. 
  *  process_name: flexible array of chars so we can account for variable-sized process names.
  *
  */
@@ -31,6 +35,7 @@ typedef
 struct 
 {
     unsigned int pid;
+    char percentage[4];
     char process_name[];
 } ProgramData;
 
