@@ -95,11 +95,10 @@ ProgramData** read_proc (ProgramData** procs, int* size, int* capacity) {
             ProgramData* proc = malloc (sizeof (ProgramData));
 
             proc->pid = atoi (dirData->d_name);
-	    proc->pid = -1;
-	    proc->usage = -999.999;
-	    proc->process_name[0] = '\0';
-	    proc->utime = 0;
-	    proc->stime = 0;
+            proc->usage = -999.999;
+            proc->process_name[0] = '\0';
+            proc->utime = 0;
+            proc->stime = 0;
             // get the path to the stat file of the pid dir.
             char path[300];
             snprintf (path, sizeof (path), "/proc/%s/stat", dirData->d_name);
@@ -121,8 +120,8 @@ ProgramData** read_proc (ProgramData** procs, int* size, int* capacity) {
             proc->utime = utime;
             proc->stime = stime;
             strcpy (proc->process_name, process_name);
-	
-	    fclose(stat);
+
+            fclose (stat);
 
             if (*size >= *capacity) {
 
@@ -137,8 +136,7 @@ ProgramData** read_proc (ProgramData** procs, int* size, int* capacity) {
 
                 for (int i = 0; i < *size; ++i) {
                     if (procs[i] != NULL) {
-                        temp[i] = malloc (sizeof (
-                            ProgramData));
+                        temp[i] = malloc (sizeof (ProgramData));
 
                         memcpy (temp[i], procs[i], sizeof (ProgramData));
                     }
@@ -147,7 +145,7 @@ ProgramData** read_proc (ProgramData** procs, int* size, int* capacity) {
                 for (int i = 0; i < *capacity; i++) {
                     free (procs[i]);
                 }
-		free(procs);
+                free (procs);
 
                 procs = temp;
                 *capacity = new_cap;
@@ -163,7 +161,6 @@ ProgramData** read_proc (ProgramData** procs, int* size, int* capacity) {
 }
 
 ProgramData* _procCpuData (ProgramData* data) {
-	
 
     ProgramData** procs = malloc (10 * sizeof (ProgramData*));
 
@@ -171,22 +168,21 @@ ProgramData* _procCpuData (ProgramData* data) {
     int capacity = 10;
     ProgramData** procs2 = read_proc (procs, &all_procs_size, &capacity);
     unsigned long long total_cpu_time_start = _getTotalCpuTime ();
-
-
     usleep (600000);
     ProgramData** procs_last = malloc (10 * sizeof (ProgramData*));
 
     int all_procs_size_last = 0;
-     capacity = 10;
-    ProgramData** procs2_last = read_proc (procs_last, &all_procs_size_last, &capacity);
-    unsigned long long total_cpu_time_last = _getTotalCpuTime ();
+    capacity = 10;
+    ProgramData** procs2_last =
+        read_proc (procs_last, &all_procs_size_last, &capacity);
 
+
+    unsigned long long total_cpu_time_last = _getTotalCpuTime ();
 
     unsigned long long total_cpu_time_end = _getTotalCpuTime ();
 
     unsigned long long elapsed_cpu_time =
         total_cpu_time_end - total_cpu_time_start;
-
 
     long num_cpus = sysconf (_SC_NPROCESSORS_CONF);
 
@@ -195,26 +191,32 @@ ProgramData* _procCpuData (ProgramData* data) {
         ProgramData* start = procs2[i];
 
         ProgramData* starta = procs2_last[i];
-	
 
-	if(!start || !starta) continue;
+        if (!start || !starta)
+            continue;
 
+        unsigned long long cpu_time =
+            ((starta->utime + starta->stime) - (start->utime + start->stime));
 
-                unsigned long long cpu_time =
-                   ((starta->utime + starta->stime) - (start->utime +
-                   start->stime));
+        float usage = (cpu_time / (float)elapsed_cpu_time) * 100.0 * num_cpus;
 
-                float usage = (cpu_time / (float)elapsed_cpu_time) * 100.0 *
-                num_cpus;
+        if (usage > data->usage) {
 
-            if (usage > data->usage) {
-
-                   data->usage = usage;
-                  strcpy (data->process_name, start->process_name);
-           }
-
+            data->usage = usage;
+            strcpy (data->process_name, start->process_name);
+        }
     }
 
+    // Free the dynamically allocated memory for procs and procs_last
+    for (int i = 0; i < all_procs_size; ++i) {
+        if(procs2[i] !=NULL)free (procs2[i]);
+    }
+    free(procs2);
+    for (int i = 0; i < all_procs_size_last; ++i) {
+    
+        if(procs2_last[i] !=NULL)free (procs2_last[i]);
+    }
+    free(procs2_last);
     return data;
 }
 
@@ -241,7 +243,7 @@ int main (int argc, char* argv[]) {
 
     ProgramData* data = getHighestProcess ();
 
-     printf ("%s\n", data->process_name);
+    printf ("%s\n", data->process_name);
     free (data);
     return 0;
 }
