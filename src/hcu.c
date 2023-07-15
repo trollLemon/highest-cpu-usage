@@ -17,145 +17,228 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <stdio.h>   
-#include <stdlib.h> 
-#include <stddef.h>
 #include <dirent.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#define MAX_NAME_LENGTH  257
+#include <sys/times.h>
+#include <unistd.h>
 
-
-
-
-
-
-
-
-
-/*TODO: get % of cpu a process is using*/
-
-
-
-/*  
+/*
  *  :::::::::::::ProgramData:::::::::::::::
  *  This struct will hold relevant program data.
  *  Pid: this is the process id.
- *  percentage: this is the percentage of the CPU the process is using. 
+ *  percentage: this is the percentage of the CPU the process is using.
  *  process_name: array of chars for process names.
  *
  */
-typedef 
-struct 
-{
+typedef struct {
     unsigned int pid;
-    unsigned long perc;
-    char process_name[MAX_NAME_LENGTH];
+    unsigned long long utime;
+    unsigned long long stime;
+    float usage;
+    char process_name[256];
 } ProgramData;
-
-
 
 /*
  * Print help text
  */
-void 
-PrintHelp() 
-{}
+void PrintHelp () {}
 
+void _alloc_array (ProgramData** procs, int cap) {
 
-
-
-/*
- * ::::::::::::_procCpuData::::::::::::::
- *  Given a non-null ProgramData pointer, this function will assign the pid, cpu %, and process name of the process with the highest CPU usage.
- *  to the ProgramData pointer
- *  
- *  To get this data, the function shall read each PID directory in /proc, while updating the pid, cpu  and process_name in O(n) time.
- *
- *
- */
-void 
-_procCpuData(ProgramData *data) 
-{ 
-	DIR *proc = opendir("/proc");
-	
-	struct dirent* dirData;
-
-	while((dirData = readdir(proc)) != NULL)
-	{
-	
-	//filter out ./ and ../ otherwise we will go out of /proc and into some other directory, that would be weird if that happened.
-	//also make sure we are looking at another directory and dont treat a text file like one
-	if (dirData->d_type == DT_DIR && strcmp(dirData->d_name, "..") != 0 && strcmp(dirData->d_name, ".") != 0)
-	{
-		
-	    //get the path to the stat file of the pid dir.
-	    char path[300];
-            snprintf(path, sizeof(path), "/proc/%s/stat", dirData->d_name);
-            FILE* file = fopen(path, "r");
-	    if (file != NULL)
-	    {
-	    
-		    int pid = 0;
-		    char process_name[MAX_NAME_LENGTH];
-		    unsigned long user_time = 0;
-		    unsigned long system_time = 0;
-	    	    fscanf(file, "%d %s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %lu %lu",
-       			&pid, process_name, &user_time, &system_time);
-	    	
-		    //if we found a process with more cpu, update the data pointer
-		    if(user_time + system_time > data->perc){
-			
-			    data->pid = pid;
-			    data->perc= user_time+system_time;
-			    strcpy(data->process_name, process_name);
-
-		    }
-		    
-
-	    }
-	
-	}
-
-	}
-
-
+    for (int i = 0; i < cap; i++) {
+        procs[i] = malloc (sizeof (ProgramData));
+        if (procs[i] == NULL) {
+            printf ("Memory allocation failed.\n");
+            for (int j = 0; j < i; j++) {
+                free (procs[j]);
+            }
+        }
+    }
 }
 
+unsigned long long _getTotalCpuTime () {
+
+    FILE* file = fopen ("/proc/stat", "r");
+    if (file == NULL) {
+        perror ("Could not open stat file");
+        return 0;
+    }
+
+    unsigned long long data[8];
+
+    fscanf (file, "cpu  %llu %llu %llu %llu %llu %llu %llu %llu", &data[0],
+            &data[1], &data[2], &data[3], &data[4], &data[5], &data[6],
+            &data[7]);
+
+    unsigned long long time = 0;
+
+    for (int i = 0; i < 8; ++i) {
+        time += data[i];
+    }
+
+    fclose (file);
+
+    return time;
+}
+
+ProgramData** read_proc (ProgramData** procs, int* size, int* capacity) {
+
+    DIR* dir = opendir ("/proc");
+
+    struct dirent* dirData;
+    while ((dirData = readdir (dir)) != NULL) {
+        if (dirData->d_type == DT_DIR && atoi (dirData->d_name)) {
+
+            ProgramData* proc = malloc (sizeof (ProgramData));
+
+            proc->pid = atoi (dirData->d_name);
+
+            // get the path to the stat file of the pid dir.
+            char path[300];
+            snprintf (path, sizeof (path), "/proc/%s/stat", dirData->d_name);
+
+            char process_name[30];
+            unsigned long utime = 0;
+            unsigned long stime = 0;
+            FILE* stat = fopen (path, "r");
+            if (stat == NULL) {
+                free (stat);
+                free (proc);
+                continue;
+            }
+
+            fscanf (stat,
+                    "%*d %29s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu "
+                    "%lu %*d %*d %*d %*d %*d %*d %*u %*u %*ld",
+                    process_name, &utime, &stime);
+
+            proc->utime = utime;
+            proc->stime = stime;
+            strcpy (proc->process_name, process_name);
+
+            if (*size >= *capacity) {
+
+                int new_cap = *capacity * 2;
+                ProgramData** temp = malloc (new_cap * sizeof (ProgramData*));
+                if (temp == NULL) {
+                    fprintf (stderr, "Failed to reallocate memory.\n");
+                    return NULL;
+                }
+
+                // memmove(temp,procs, new_cap*sizeof(ProgramData*));
+
+                for (int i = 0; i < *size; ++i) {
+                    if (procs[i] != NULL) {
+                        temp[i] = malloc (sizeof (
+                            ProgramData)); 
+                        memcpy (temp[i], procs[i], sizeof (ProgramData));
+                    }
+                }
+
+                for (int i = 0; i < *capacity; i++) {
+                    free (procs[i]);
+                }
+                procs = temp;
+                *capacity = new_cap;
+            }
+            procs[*size] = proc;
+
+            (*size)++;
+        }
+    }
+
+    closedir (dir);
+    return procs;
+}
+
+ProgramData* _procCpuData (ProgramData* data) {
+
+    ProgramData** procs = malloc (10 * sizeof (ProgramData*));
+
+    int all_procs_size = 0;
+    int capacity = 10;
+    //_alloc_array(procs, capacity);
+    ProgramData** procs2 = read_proc (procs, &all_procs_size, &capacity);
+    unsigned long long total_cpu_time_start = _getTotalCpuTime ();
+    free(procs);
+
+
+    usleep (600000);
+    ProgramData** procs_last = malloc (10 * sizeof (ProgramData*));
+
+    int all_procs_size_last = 0;
+     capacity = 10;
+    //_alloc_array(procs, capacity);
+    ProgramData** procs2_last = read_proc (procs_last, &all_procs_size_last, &capacity);
+    unsigned long long total_cpu_time_last = _getTotalCpuTime ();
+    free(procs_last);
+
+    return data;
 
 
 
+    unsigned long long total_cpu_time_end = _getTotalCpuTime ();
+
+    unsigned long long elapsed_cpu_time =
+        total_cpu_time_end - total_cpu_time_start;
+
+
+    long num_cpus = sysconf (_SC_NPROCESSORS_CONF);
+
+    for (int i = 0; i < all_procs_size_last; ++i) {
+
+        ProgramData* start = procs[i];
+        //	    printf("%d,%s,%llu,%llu, %llu\n", start.pid,
+        // start.process_name, start.utime, start.stime, elapsed_cpu_time);
+
+        ProgramData* starta = procs_last[i];
+        //	    printf("%d,%s,%llu,%llu, %llu\n", starta.pid,
+        // starta.process_name, starta.utime, starta.stime, elapsed_cpu_time);
+
+        //        unsigned long long cpu_time =
+        //           ((starta->utime + starta->stime) - (start->utime +
+        //           start->stime));
+
+        //        float usage = (cpu_time / (float)elapsed_cpu_time) * 100.0 *
+        //        num_cpus;
+
+        //    if (usage > data->usage) {
+
+        //           data->usage = usage;
+        //          strcpy (data->process_name, start->process_name);
+        //   }
+
+        //	   printf("%.5f\n", usage);
+    }
+
+    return data;
+}
 
 /*
  * ::::::::::::getHighestProcess()::::::::::::::
- * This function will return a ProgramData pointer with information about the process using the highest amount of CPU.
- * If there is any issue getting the data, this function will return NULL. As a result, the function also assumes 
- * the client code will handle any NULL returned.
+ * This function will return a ProgramData pointer with information about the
+ * process using the highest amount of CPU. If there is any issue getting the
+ * data, this function will return NULL. As a result, the function also
+ * assumes the client code will handle any NULL returned.
  *
  */
-ProgramData*
-getHighestProcess()
-{
-	ProgramData *data = malloc (sizeof(ProgramData));
-	data->pid = -1;
-	data->perc= 0;
-	data->process_name[0] = '\0';
-	_procCpuData(data);
-
-
-	return data;
+ProgramData* getHighestProcess () {
+    ProgramData* data = malloc (sizeof (ProgramData));
+    data->pid = -1;
+    data->usage = -999.999;
+    data->process_name[0] = '\0';
+    _procCpuData (data);
+    return data;
 }
 
+int main (int argc, char* argv[]) {
 
-int 
-main(int argc, char *argv[]) 
-{ 
-	
- 	ProgramData *data = getHighestProcess();
-	
-	printf("%s", data->process_name);
-	free(data);
-	return 0; 
+    ProgramData* data = getHighestProcess ();
 
-
-
+    // printf ("%s\n", data->process_name);
+    free (data);
+    return 0;
 }
