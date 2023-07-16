@@ -84,21 +84,34 @@ unsigned long long _getTotalCpuTime () {
     return time;
 }
 
-ProgramData** read_proc (ProgramData** procs, int* size, int* capacity) {
+ProgramData** read_proc (int* size) {
+
+
+
+    ProgramData** procs = malloc (10 * sizeof (ProgramData*));
+
+    int capacity = 10;
+
+
+
 
     DIR* dir = opendir ("/proc");
 
     struct dirent* dirData;
     while ((dirData = readdir (dir)) != NULL) {
-        if (dirData->d_type == DT_DIR && atoi (dirData->d_name)) {
+            // ignore ./ ../ and other dirs that are not PID dirs
+	    if (dirData->d_type == DT_DIR && atoi (dirData->d_name)) {
 
             ProgramData* proc = malloc (sizeof (ProgramData));
 
+	    //set initial values
             proc->pid = atoi (dirData->d_name);
             proc->usage = -999.999;
             proc->process_name[0] = '\0';
             proc->utime = 0;
             proc->stime = 0;
+
+
             // get the path to the stat file of the pid dir.
             char path[300];
             snprintf (path, sizeof (path), "/proc/%s/stat", dirData->d_name);
@@ -106,12 +119,14 @@ ProgramData** read_proc (ProgramData** procs, int* size, int* capacity) {
             char process_name[30];
             unsigned long utime = 0;
             unsigned long stime = 0;
-            FILE* stat = fopen (path, "r");
+            
+	    FILE* stat = fopen (path, "r");
             if (stat == NULL) {
                 free (proc);
                 continue;
             }
 
+	    //get relevant info from /proc/pid/stat
             fscanf (stat,
                     "%*d %29s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu "
                     "%lu %*d %*d %*d %*d %*d %*d %*u %*u %*ld",
@@ -119,13 +134,17 @@ ProgramData** read_proc (ProgramData** procs, int* size, int* capacity) {
 
             proc->utime = utime;
             proc->stime = stime;
+
             strcpy (proc->process_name, process_name);
 
             fclose (stat);
 
-            if (*size >= *capacity) {
+	    // if our array gets full, make a new one with twice the capacity and
+	    // copy everything over
+            if (*size >= capacity) {
 
-                int new_cap = *capacity * 2;
+                int new_cap = capacity * 2;
+		//alloc a new array
                 ProgramData** temp = malloc (new_cap * sizeof (ProgramData*));
                 if (temp == NULL) {
                     fprintf (stderr, "Failed to reallocate memory.\n");
@@ -134,6 +153,7 @@ ProgramData** read_proc (ProgramData** procs, int* size, int* capacity) {
 
                 // memmove(temp,procs, new_cap*sizeof(ProgramData*));
 
+		//copy all the old data over
                 for (int i = 0; i < *size; ++i) {
                     if (procs[i] != NULL) {
                         temp[i] = malloc (sizeof (ProgramData));
@@ -142,13 +162,14 @@ ProgramData** read_proc (ProgramData** procs, int* size, int* capacity) {
                     }
                 }
 
-                for (int i = 0; i < *capacity; i++) {
+		//free the old array
+                for (int i = 0; i <capacity; i++) {
                     free (procs[i]);
                 }
                 free (procs);
 
                 procs = temp;
-                *capacity = new_cap;
+                capacity = new_cap;
             }
             procs[*size] = proc;
 
@@ -161,20 +182,20 @@ ProgramData** read_proc (ProgramData** procs, int* size, int* capacity) {
 }
 
 ProgramData* _procCpuData (ProgramData* data) {
+    
 
-    ProgramData** procs = malloc (10 * sizeof (ProgramData*));
+    int all_procs_size =0;
+    int all_procs_size_last=0;
 
-    int all_procs_size = 0;
-    int capacity = 10;
-    ProgramData** procs2 = read_proc (procs, &all_procs_size, &capacity);
+    ProgramData** procs_start = read_proc (&all_procs_size);
+    
     unsigned long long total_cpu_time_start = _getTotalCpuTime ();
-    usleep (600000);
-    ProgramData** procs_last = malloc (10 * sizeof (ProgramData*));
+    
 
-    int all_procs_size_last = 0;
-    capacity = 10;
-    ProgramData** procs2_last =
-        read_proc (procs_last, &all_procs_size_last, &capacity);
+    sleep (1);
+    
+
+    ProgramData** procs_end =read_proc (&all_procs_size_last);
 
 
     unsigned long long total_cpu_time_last = _getTotalCpuTime ();
@@ -188,9 +209,9 @@ ProgramData* _procCpuData (ProgramData* data) {
 
     for (int i = 0; i < all_procs_size_last; ++i) {
 
-        ProgramData* start = procs2[i];
+        ProgramData* start = procs_start[i];
 
-        ProgramData* starta = procs2_last[i];
+        ProgramData* starta = procs_end[i];
 
         if (!start || !starta)
             continue;
@@ -209,14 +230,14 @@ ProgramData* _procCpuData (ProgramData* data) {
 
     // Free the dynamically allocated memory for procs and procs_last
     for (int i = 0; i < all_procs_size; ++i) {
-        if(procs2[i] !=NULL)free (procs2[i]);
+        if(procs_start[i] !=NULL)free (procs_start[i]);
     }
-    free(procs2);
+    free(procs_start);
     for (int i = 0; i < all_procs_size_last; ++i) {
     
-        if(procs2_last[i] !=NULL)free (procs2_last[i]);
+        if(procs_end[i] !=NULL)free (procs_end[i]);
     }
-    free(procs2_last);
+    free(procs_end);
     return data;
 }
 
