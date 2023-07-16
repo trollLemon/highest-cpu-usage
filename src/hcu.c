@@ -18,11 +18,9 @@
  */
 
 #include <dirent.h>
-#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/times.h>
 #include <unistd.h>
 
 /*
