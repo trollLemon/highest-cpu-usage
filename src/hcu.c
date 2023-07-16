@@ -138,7 +138,7 @@ ProgramData** _readProc (int* size) {
 
 	    //get relevant info from /proc/pid/stat
             fscanf (stat,
-                    "%*d %29s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu "
+                    "%*d %s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu "
                     "%lu %*d %*d %*d %*d %*d %*d %*u %*u %*ld",
                     process_name, &utime, &stime);
 
@@ -229,13 +229,13 @@ ProgramData* _procCpuData (ProgramData* data) {
 
         ProgramData* start = procs_start[i];
 
-        ProgramData* starta = procs_end[i];
+        ProgramData* end = procs_end[i];
 
-        if (!start || !starta)
+        if (!start || !end)
             continue;
 
         unsigned long long cpu_time =
-            ((starta->utime + starta->stime) - (start->utime + start->stime));
+            ((end->utime + end->stime) - (start->utime + start->stime));
 
         float usage = (cpu_time / (float)elapsed_cpu_time) * 100.0 * num_cpus;
 
