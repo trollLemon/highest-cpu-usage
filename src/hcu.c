@@ -216,7 +216,6 @@ ProgramData* _procCpuData (ProgramData* data) {
     ProgramData** procs_end =_readProc (&all_procs_size_last);
 
 
-    unsigned long long total_cpu_time_last = _getTotalCpuTime ();
 
     unsigned long long total_cpu_time_end = _getTotalCpuTime ();
 
