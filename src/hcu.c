@@ -84,7 +84,19 @@ unsigned long long _getTotalCpuTime () {
     return time;
 }
 
-ProgramData** read_proc (int* size) {
+
+/*
+ * ::::::::::::_readProc()::::::::::::::
+ *
+ * This function will return an array containing ProgramData* for every running process in
+ * /proc. Requires a pointer to an integer so the client code can keep track of the size.
+ *
+ * Any error reading from the /proc/PID/stat will result in the function returning NULL.
+ *
+ */
+
+
+ProgramData** _readProc (int* size) {
 
 
 
@@ -181,13 +193,21 @@ ProgramData** read_proc (int* size) {
     return procs;
 }
 
+/*
+ * ::::::::::::_procCpuData()::::::::::::::
+ * This function will fill a ProgramData pointer with information about the
+ * process using the highest amount of CPU by sampling cpu time for every proces twice, then comparing the values. 
+ * If there is any issue getting the data, this function will return NULL. As a result, the function also
+ * assumes the client code will handle any NULL returned.
+ */
+
 ProgramData* _procCpuData (ProgramData* data) {
     
 
     int all_procs_size =0;
     int all_procs_size_last=0;
 
-    ProgramData** procs_start = read_proc (&all_procs_size);
+    ProgramData** procs_start = _readProc (&all_procs_size);
     
     unsigned long long total_cpu_time_start = _getTotalCpuTime ();
     
@@ -195,7 +215,7 @@ ProgramData* _procCpuData (ProgramData* data) {
     sleep (1);
     
 
-    ProgramData** procs_end =read_proc (&all_procs_size_last);
+    ProgramData** procs_end =_readProc (&all_procs_size_last);
 
 
     unsigned long long total_cpu_time_last = _getTotalCpuTime ();
@@ -260,6 +280,8 @@ ProgramData* getHighestProcess () {
     return data;
 }
 
+
+//TODO: add options for showing PID and usage
 int main (int argc, char* argv[]) {
 
     ProgramData* data = getHighestProcess ();
