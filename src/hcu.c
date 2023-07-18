@@ -42,7 +42,10 @@ typedef struct {
 /*
  * Print help text
  */
-void PrintHelp () {}
+void PrintHelp (char* binary_name) {
+
+    fprintf (stderr, "Usage: %s [-p] [-u]\nOutput Format:\n process name, pid, cpu usage\n", binary_name);
+}
 
 void _alloc_array (ProgramData** procs, int cap) {
 
@@ -82,45 +85,39 @@ unsigned long long _getTotalCpuTime () {
     return time;
 }
 
-
 /*
  * ::::::::::::_readProc()::::::::::::::
  *
- * This function will return an array containing ProgramData* for every running process in
- * /proc. Requires a pointer to an integer so the client code can keep track of the size.
+ * This function will return an array containing ProgramData* for every running
+ * process in /proc. Requires a pointer to an integer so the client code can
+ * keep track of the size.
  *
- * Any error reading from the /proc/PID/stat will result in the function returning NULL.
+ * Any error reading from the /proc/PID/stat will result in the function
+ * returning NULL.
  *
  */
 
-
 ProgramData** _readProc (int* size) {
-
-
 
     ProgramData** procs = malloc (10 * sizeof (ProgramData*));
 
     int capacity = 10;
 
-
-
-
     DIR* dir = opendir ("/proc");
 
     struct dirent* dirData;
     while ((dirData = readdir (dir)) != NULL) {
-            // ignore ./ ../ and other dirs that are not PID dirs
-	    if (dirData->d_type == DT_DIR && atoi (dirData->d_name)) {
+        // ignore ./ ../ and other dirs that are not PID dirs
+        if (dirData->d_type == DT_DIR && atoi (dirData->d_name)) {
 
             ProgramData* proc = malloc (sizeof (ProgramData));
 
-	    //set initial values
+            // set initial values
             proc->pid = atoi (dirData->d_name);
             proc->usage = -999.999;
             proc->process_name[0] = '\0';
             proc->utime = 0;
             proc->stime = 0;
-
 
             // get the path to the stat file of the pid dir.
             char path[300];
@@ -129,14 +126,14 @@ ProgramData** _readProc (int* size) {
             char process_name[30];
             unsigned long utime = 0;
             unsigned long stime = 0;
-            
-	    FILE* stat = fopen (path, "r");
+
+            FILE* stat = fopen (path, "r");
             if (stat == NULL) {
                 free (proc);
                 continue;
             }
 
-	    //get relevant info from /proc/pid/stat
+            // get relevant info from /proc/pid/stat
             fscanf (stat,
                     "%*d %s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu "
                     "%lu %*d %*d %*d %*d %*d %*d %*u %*u %*ld",
@@ -149,12 +146,12 @@ ProgramData** _readProc (int* size) {
 
             fclose (stat);
 
-	    // if our array gets full, make a new one with twice the capacity and
-	    // copy everything over
+            // if our array gets full, make a new one with twice the capacity
+            // and copy everything over
             if (*size >= capacity) {
 
                 int new_cap = capacity * 2;
-		//alloc a new array
+                // alloc a new array
                 ProgramData** temp = malloc (new_cap * sizeof (ProgramData*));
                 if (temp == NULL) {
                     fprintf (stderr, "Failed to reallocate memory.\n");
@@ -163,7 +160,7 @@ ProgramData** _readProc (int* size) {
 
                 // memmove(temp,procs, new_cap*sizeof(ProgramData*));
 
-		//copy all the old data over
+                // copy all the old data over
                 for (int i = 0; i < *size; ++i) {
                     if (procs[i] != NULL) {
                         temp[i] = malloc (sizeof (ProgramData));
@@ -172,8 +169,8 @@ ProgramData** _readProc (int* size) {
                     }
                 }
 
-		//free the old array
-                for (int i = 0; i <capacity; i++) {
+                // free the old array
+                for (int i = 0; i < capacity; i++) {
                     free (procs[i]);
                 }
                 free (procs);
@@ -194,28 +191,24 @@ ProgramData** _readProc (int* size) {
 /*
  * ::::::::::::_procCpuData()::::::::::::::
  * This function will fill a ProgramData pointer with information about the
- * process using the highest amount of CPU by sampling cpu time for every proces twice, then comparing the values. 
- * If there is any issue getting the data, this function will return NULL. As a result, the function also
- * assumes the client code will handle any NULL returned.
+ * process using the highest amount of CPU by sampling cpu time for every proces
+ * twice, then comparing the values. If there is any issue getting the data,
+ * this function will return NULL. As a result, the function also assumes the
+ * client code will handle any NULL returned.
  */
 
 ProgramData* _procCpuData (ProgramData* data) {
-    
 
-    int all_procs_size =0;
-    int all_procs_size_last=0;
+    int all_procs_size = 0;
+    int all_procs_size_last = 0;
 
     ProgramData** procs_start = _readProc (&all_procs_size);
-    
+
     unsigned long long total_cpu_time_start = _getTotalCpuTime ();
-    
 
     sleep (1);
-    
 
-    ProgramData** procs_end =_readProc (&all_procs_size_last);
-
-
+    ProgramData** procs_end = _readProc (&all_procs_size_last);
 
     unsigned long long total_cpu_time_end = _getTotalCpuTime ();
 
@@ -241,20 +234,23 @@ ProgramData* _procCpuData (ProgramData* data) {
         if (usage > data->usage) {
 
             data->usage = usage;
+	    data->pid = end->pid;
             strcpy (data->process_name, start->process_name);
         }
     }
 
     // Free the dynamically allocated memory for procs and procs_last
     for (int i = 0; i < all_procs_size; ++i) {
-        if(procs_start[i] !=NULL)free (procs_start[i]);
+        if (procs_start[i] != NULL)
+            free (procs_start[i]);
     }
-    free(procs_start);
+    free (procs_start);
     for (int i = 0; i < all_procs_size_last; ++i) {
-    
-        if(procs_end[i] !=NULL)free (procs_end[i]);
+
+        if (procs_end[i] != NULL)
+            free (procs_end[i]);
     }
-    free(procs_end);
+    free (procs_end);
     return data;
 }
 
@@ -277,13 +273,47 @@ ProgramData* getHighestProcess () {
     return data;
 }
 
-
-//TODO: add options for showing PID and usage
+// TODO: add options for showing PID and usage
 int main (int argc, char* argv[]) {
+
+    int opt;
+    int show_pid = 0;   // Flag for showing PID
+    int show_usage = 0; // Flag for showing usage
+
+    while ((opt = getopt (argc, argv, "pu")) != -1) {
+        switch (opt) {
+        case 'p':
+            show_pid = 1;
+            break;
+        case 'u':
+            show_usage = 1;
+            break;
+        default:
+            PrintHelp (argv[0]);
+            return 1;
+        }
+    }
 
     ProgramData* data = getHighestProcess ();
 
-    printf ("%s\n", data->process_name);
+    if (show_pid&&show_usage) {
+
+        printf ("%s : %d : %.2f  \n", data->process_name, data->pid,data->usage);
+    }
+
+    else if (show_pid) {
+
+        printf ("%s : %d \n", data->process_name, data->pid);
+    }
+
+    else if (show_usage) {
+
+        printf ("%s : %.2f\n", data->process_name, data->usage);
+    } else {
+
+        printf ("%s\n", data->process_name);
+    }
+
     free (data);
     return 0;
 }
