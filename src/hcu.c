@@ -47,18 +47,20 @@ void PrintHelp (char* binary_name) {
     fprintf (stderr, "Usage: %s [-p] [-u]\nOutput Format:\n process name, pid, cpu usage\n", binary_name);
 }
 
-void _alloc_array (ProgramData** procs, int cap) {
 
-    for (int i = 0; i < cap; i++) {
-        procs[i] = malloc (sizeof (ProgramData));
-        if (procs[i] == NULL) {
-            printf ("Memory allocation failed.\n");
-            for (int j = 0; j < i; j++) {
-                free (procs[j]);
-            }
-        }
-    }
-}
+/*
+ * ::::::::::::_getTotalCpuTime()::::::::::::::
+ * This function returns the total cpu time from 
+ * the machine start to when this function is called.
+ *
+ * The function reads from /proc/stat for cpu data.
+ *
+ * If there is any error reading /proc/stat, this function shall
+ * return 0.
+ *
+ */
+
+
 
 unsigned long long _getTotalCpuTime () {
 
